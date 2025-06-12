@@ -10,16 +10,33 @@ This Discord music bot allows users to play music in voice channels using slash 
 
 ## Installation
 
-1. Install dependencies:
+### Windows
+1. Run the setup script:
 ```
-npm install
+setup.cmd
 ```
 
-2. Configure your bot:
-   - Edit `main.js` and replace the placeholder values:
-     - `YOUR_DISCORD_BOT_TOKEN` - Your Discord bot token
-     - `YOUR_CLIENT_ID` - Your Discord application's client ID
-     - `YOUR_GUILD_ID` - (Optional) Your Discord server ID for testing
+2. Configure your bot by editing the `.env` file with:
+   - `TOKEN` - Your Discord bot token
+   - `CLIENT_ID` - Your Discord application's client ID
+   - `GUILD_ID` - (Optional) Your Discord server ID for testing
+
+3. Start the bot:
+```
+node main.js
+```
+
+### Linux/macOS
+1. Run the setup script:
+```
+chmod +x setup.sh
+./setup.sh
+```
+
+2. Configure your bot by editing the `.env` file with:
+   - `TOKEN` - Your Discord bot token
+   - `CLIENT_ID` - Your Discord application's client ID
+   - `GUILD_ID` - (Optional) Your Discord server ID for testing
 
 3. Start the bot:
 ```
@@ -40,8 +57,17 @@ The bot supports the following slash commands:
 
 - Make sure your bot has the necessary permissions in your Discord server
 - For voice connection issues, ensure you have the required dependencies:
-  - On Windows: ffmpeg may need to be installed separately
-  - On Linux: additional packages may be required (libtool, build-essential, etc.)
+  - On Windows: The setup script should handle dependencies
+  - On Linux: If the setup script fails, manually install these packages:
+    ```
+    sudo apt install python3 build-essential ffmpeg
+    ```
+    (Adjust for your Linux distribution)
+    
+- If you see errors related to sodium or voice connections:
+  1. Try installing with `npm install --no-optional`
+  2. Make sure ffmpeg is installed on your system
+  3. Check that your bot has permissions to join voice channels
 
 ## Additional Notes
 

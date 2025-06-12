@@ -11,6 +11,7 @@ import {
 import ytdl from 'ytdl-core';
 import play from 'play-dl';
 import dotenv from 'dotenv';
+import sodium from 'libsodium-wrappers';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -285,13 +286,22 @@ async function playSong(guild, song) {
   }
   
   try {
+    // Make sure sodium is ready before creating audio resources
+    await sodium.ready;
+    
     // Get audio stream
     const stream = await play.stream(song.url);
     
     // Create audio resource
     const resource = createAudioResource(stream.stream, {
       inputType: stream.type,
+      inlineVolume: true
     });
+    
+    // Set volume
+    if (resource.volume) {
+      resource.volume.setVolume(serverQueue.volume / 10);
+    }
     
     // Play the song
     serverQueue.player.play(resource);
@@ -389,4 +399,15 @@ function resumeSong(interaction, serverQueue) {
 }
 
 // Login to Discord
-client.login(TOKEN);
+(async () => {
+  try {
+    // Make sure sodium is ready before connecting
+    await sodium.ready;
+    console.log('Sodium initialized');
+    
+    await client.login(TOKEN);
+    console.log('Discord bot initialized');
+  } catch (error) {
+    console.error('Error during initialization:', error);
+  }
+})();
