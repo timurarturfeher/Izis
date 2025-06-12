@@ -53,6 +53,33 @@ The bot supports the following slash commands:
 - `/pause` - Pause the current song
 - `/resume` - Resume a paused song
 
+## Command Management
+
+If you need to update, remove, or force-register slash commands, use the command management tools:
+
+### Windows
+```
+manage-commands.cmd delete-global  # Delete all global commands
+manage-commands.cmd delete-guild   # Delete all guild commands
+manage-commands.cmd force-global   # Force-register global commands
+manage-commands.cmd force-guild    # Force-register guild commands
+```
+
+### Linux/macOS
+```
+chmod +x manage-commands.sh
+./manage-commands.sh delete-global  # Delete all global commands
+./manage-commands.sh delete-guild   # Delete all guild commands
+./manage-commands.sh force-global   # Force-register global commands
+./manage-commands.sh force-guild    # Force-register guild commands
+```
+
+These tools are useful when:
+- Commands aren't showing up in Discord
+- You need to remove old or outdated commands
+- You want to update commands without restarting the bot
+- You're switching between testing in a specific guild and global commands
+
 ## Troubleshooting
 
 - Make sure your bot has the necessary permissions in your Discord server

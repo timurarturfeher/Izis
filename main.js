@@ -64,6 +64,9 @@ const commands = [
 // Convert commands to JSON
 const commandsJSON = commands.map(command => command.toJSON());
 
+// Export commands for manage-commands.js
+export { commandsJSON };
+
 // Register slash commands when bot is ready
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
