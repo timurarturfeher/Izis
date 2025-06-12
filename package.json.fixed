@@ -1,0 +1,27 @@
+{
+  "name": "discord-music-bot",
+  "version": "1.0.0",
+  "description": "A Discord music bot with basic commands",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "start": "node main.js",
+    "deploy": "node deploy-commands.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.13.0",
+    "@discordjs/voice": "^0.16.0",
+    "ytdl-core": "^4.11.5",
+    "play-dl": "^1.9.7",
+    "libsodium-wrappers": "^0.7.13",
+    "dotenv": "^16.3.1",
+    "ffmpeg-static": "^5.2.0",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=16.9.0"
+  }
+}

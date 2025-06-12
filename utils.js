@@ -106,3 +106,50 @@ export function createSongEmbed(song, status) {
     }
   };
 }
+
+/**
+ * Search for YouTube videos using a fallback method
+ * @param {string} query - The search query
+ * @returns {Promise<{title: string, url: string, thumbnail: string}>} A song object
+ */
+export async function searchYouTube(query) {
+  const fetch = (await import('node-fetch')).default;
+  
+  try {
+    const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+    const response = await fetch(searchUrl);
+    const html = await response.text();
+    
+    // Extract video IDs from the HTML response
+    const regex = /\/watch\?v=([a-zA-Z0-9_-]{11})/g;
+    const matches = html.matchAll(regex);
+    const videoIds = [...new Set([...matches].map(match => match[1]))];
+    
+    if (videoIds.length > 0) {
+      const videoUrl = `https://www.youtube.com/watch?v=${videoIds[0]}`;
+      
+      // Try to get video info using ytdl
+      try {
+        const ytdl = (await import('ytdl-core')).default;
+        const info = await ytdl.getBasicInfo(videoUrl);
+        return {
+          title: info.videoDetails.title,
+          url: videoUrl,
+          thumbnail: info.videoDetails.thumbnails?.[0]?.url
+        };
+      } catch (ytdlError) {
+        // If ytdl fails, return basic info
+        return {
+          title: query,
+          url: videoUrl,
+          thumbnail: null
+        };
+      }
+    }
+    
+    throw new Error('No videos found');
+  } catch (error) {
+    console.error('YouTube search fallback error:', error);
+    throw error;
+  }
+}

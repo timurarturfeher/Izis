@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } from 'discord.js';
+import { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { 
   joinVoiceChannel, 
   createAudioPlayer, 
@@ -12,6 +12,7 @@ import ytdl from 'ytdl-core';
 import play from 'play-dl';
 import dotenv from 'dotenv';
 import sodium from 'libsodium-wrappers';
+import { handleMusicError, searchYouTube } from './utils.js';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -158,27 +159,62 @@ async function executePlay(interaction, serverQueue, songInput) {
     await interaction.reply(`🔍 Searching for \`${songInput}\`...`);
     
     let songInfo;
-    let song;
-    
-    // Check if it's a YouTube URL or search query
+    let song;    // Check if it's a YouTube URL or search query
     if (ytdl.validateURL(songInput)) {
-      songInfo = await ytdl.getInfo(songInput);
-      song = {
-        title: songInfo.videoDetails.title,
-        url: songInfo.videoDetails.video_url,
-      };
-    } else {
-      // Search YouTube for the song
-      const searched = await play.search(songInput, { limit: 1 });
-      if (searched.length === 0) {
-        return interaction.editReply('❌ No songs found!');
+      try {
+        songInfo = await ytdl.getInfo(songInput);
+        song = {
+          title: songInfo.videoDetails.title,
+          url: songInfo.videoDetails.video_url,
+          thumbnail: songInfo.videoDetails.thumbnails?.length > 0 ? 
+            songInfo.videoDetails.thumbnails[0].url : null,
+          duration: songInfo.videoDetails.lengthSeconds ? 
+            parseInt(songInfo.videoDetails.lengthSeconds) : null
+        };
+      } catch (ytdlError) {
+        console.error('ytdl error:', ytdlError);
+        return interaction.editReply(`❌ Error processing this YouTube URL: ${handleMusicError(ytdlError)}`);
       }
-      
-      const video = searched[0];
-      song = {
-        title: video.title,
-        url: video.url,
-      };
+    } else {
+      try {
+        // First try using play-dl
+        try {
+          // Make sure we have a valid string to search
+          if (!songInput || typeof songInput !== 'string' || songInput.trim() === '') {
+            return interaction.editReply('❌ Please provide a valid search query or YouTube URL.');
+          }
+          
+          const searched = await play.search(songInput.trim(), { limit: 1 });
+          if (searched && searched.length > 0) {
+            const video = searched[0];
+            song = {
+              title: video.title,
+              url: video.url,
+              thumbnail: video.thumbnails && video.thumbnails.length > 0 ? 
+                video.thumbnails[0].url : null,
+              duration: video.durationInSec
+            };
+          } else {
+            throw new Error("No results from play-dl");
+          }
+        } catch (playDlError) {
+          console.log('play-dl search failed, using fallback search method');
+          // Fallback to our custom search utility
+          const searchResult = await searchYouTube(songInput);
+          song = searchResult;
+        }
+      } catch (searchError) {
+        console.error('All search methods failed:', searchError);
+        // Create a search link for the user
+        const fallbackUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(songInput)}`;
+        const embed = new EmbedBuilder()
+          .setColor('#FF0000')
+          .setTitle('❌ Search Failed')
+          .setDescription(`Could not find any videos matching your search. Please try:\n\n1. A more specific search term\n2. A direct YouTube URL\n3. [Search directly on YouTube](${fallbackUrl})`)
+          .setFooter({ text: 'Try copying a link directly from YouTube' });
+        
+        return interaction.editReply({ content: null, embeds: [embed] });
+      }
     }
     
     // Setup queue if it doesn't exist
@@ -289,14 +325,30 @@ async function playSong(guild, song) {
     // Make sure sodium is ready before creating audio resources
     await sodium.ready;
     
-    // Get audio stream
-    const stream = await play.stream(song.url);
+    let stream;
+    let resource;
     
-    // Create audio resource
-    const resource = createAudioResource(stream.stream, {
-      inputType: stream.type,
-      inlineVolume: true
-    });
+    try {
+      // First try play-dl (usually best quality)
+      stream = await play.stream(song.url);
+      resource = createAudioResource(stream.stream, {
+        inputType: stream.type,
+        inlineVolume: true
+      });
+    } catch (playError) {
+      console.log('play-dl stream failed, trying ytdl fallback');
+      
+      // Fallback to ytdl if play-dl fails
+      const ytdlStream = ytdl(song.url, {
+        filter: 'audioonly',
+        quality: 'highestaudio',
+        highWaterMark: 1 << 25, // 32MB buffer to prevent interruptions
+      });
+      
+      resource = createAudioResource(ytdlStream, {
+        inlineVolume: true
+      });
+    }
     
     // Set volume
     if (resource.volume) {
@@ -307,11 +359,20 @@ async function playSong(guild, song) {
     serverQueue.player.play(resource);
     serverQueue.playing = true;
     
-    // Notify channel
+    // Notify channel with simple message
     serverQueue.textChannel.send(`🎵 Now playing: **${song.title}**`);
   } catch (error) {
     console.error('Error creating audio resource:', error);
-    serverQueue.textChannel.send(`❌ Error playing song: ${error.message}`);
+    
+    // Try to get a user-friendly error message
+    let errorMessage = error.message;
+    try {
+      errorMessage = handleMusicError(error);
+    } catch(e) {
+      // If handleMusicError fails, just use the original error message
+    }
+    
+    serverQueue.textChannel.send(`❌ Error playing song: ${errorMessage}`);
     
     // Skip to next song
     serverQueue.songs.shift();
@@ -319,6 +380,14 @@ async function playSong(guild, song) {
       playSong(guild, serverQueue.songs[0]);
     }
   }
+}
+
+// Helper function to format duration
+function formatDuration(seconds) {
+  if (!seconds) return "Unknown";
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
 }
 
 // Skip command handler
